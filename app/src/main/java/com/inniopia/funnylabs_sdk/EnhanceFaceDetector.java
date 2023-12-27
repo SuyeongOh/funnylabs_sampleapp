@@ -3,6 +3,8 @@ package com.inniopia.funnylabs_sdk;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.media.MediaMetadataRetriever;
+import android.net.Uri;
 import android.os.SystemClock;
 
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
@@ -13,6 +15,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetector;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -25,11 +28,12 @@ public class EnhanceFaceDetector {
     private static final RunningMode runningMode = RunningMode.LIVE_STREAM;
 
     private DetectorListener mDetectorListener;
-
     private Context mContext;
     private Bitmap tempBitmap;
 
     private FaceDetector faceDetector;
+
+    private static int Video_Index = 0;
 
     public EnhanceFaceDetector(Context context, DetectorListener listener){
         mContext = context;
@@ -66,6 +70,33 @@ public class EnhanceFaceDetector {
             e.printStackTrace();
             mDetectorListener.onError(e.getMessage(), 1);
         }
+    }
+
+    public void detectVideoFile(ImageProxy imageProxy){
+        Uri videoUri = Uri.EMPTY;
+        try{
+            videoUri = Uri.parse(FileUtils.assetFilePath(mContext, "subject_1.mp4"));
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        retriever.setDataSource(mContext, videoUri);
+
+        Bitmap firstFrame = retriever.getFrameAtTime(0);
+
+        int width = firstFrame.getWidth();
+        int height = firstFrame.getHeight();
+
+        ArrayList<FaceDetectorResult> resultList = new ArrayList<>();
+
+        long timestamp = Video_Index * 33;
+        Bitmap curFrame = retriever.getFrameAtTime(timestamp);
+        tempBitmap = curFrame;
+        Bitmap argb8888 = curFrame.copy(Bitmap.Config.ARGB_8888, false);
+        MPImage mpImage = new BitmapImageBuilder(argb8888).build();
+        detectAsync(mpImage, timestamp);
+        Video_Index++;
     }
 
     public void detectLiveStreamFrame(ImageProxy imageProxy){

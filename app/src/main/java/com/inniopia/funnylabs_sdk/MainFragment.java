@@ -140,15 +140,16 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                 .setTargetRotation(ROTATION)
                 .build();
 
-         mImageAnalysis = new ImageAnalysis.Builder().setTargetAspectRatio(CAMERA_RATIO)
+        mImageAnalysis = new ImageAnalysis.Builder().setTargetAspectRatio(CAMERA_RATIO)
                  .setTargetRotation(ROTATION)
                  .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                  .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                  .build();
 
-         mImageAnalysis.setAnalyzer(
-                 mFrontCameraExecutor, faceDetector::detectLiveStreamFrame);
-
+        mImageAnalysis.setAnalyzer(
+                 mFrontCameraExecutor, faceDetector::detectVideoFile);
+//        mImageAnalysis.setAnalyzer(
+//                mFrontCameraExecutor, faceDetector::detectLiveStreamFrame);
         cameraProvider.unbindAll();
 
         try{
@@ -173,7 +174,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
         try {
             if (faceDetectorResults.get(0).detections().size() >= 1) {
                 RectF box = faceDetectorResults.get(0).detections().get(0).boundingBox();
-
+/*
                 if(mTrackingOverlayView.isBigSize(box)){
                     if(!isStopPredict) {
                         stopPrediction(Config.TYPE_OF_BIG);
@@ -189,7 +190,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                 }
                 isStopPredict = false;
                 mGuidePopupView.dismiss();
-
+*/
                 float x = box.right;
                 float start_x = box.left;
                 RectF rectF = new RectF(start_x, box.top, x, box.bottom);

@@ -16,6 +16,7 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import androidx.annotation.NonNull;
@@ -64,8 +65,7 @@ public class Vital {
                 inputFloatArray[pixelOffset + 3 * i] = r;
                 inputFloatArray[pixelOffset + 3 * i + 1] = g;
                 inputFloatArray[pixelOffset + 3 * i + 2] = b;
-            } catch (Exception e){
-                e.printStackTrace();
+            } catch (Exception e){e.printStackTrace();
 
             }
         }
@@ -77,14 +77,15 @@ public class Vital {
             buffer.put(inputFloatArray);
             buffer.rewind();
 
-            float[][] output = new float[1][4];
+//            float[][] output = new float[1][257];
+            float[] output = new float[257];
             mPOSModule.run(buffer, output);
 
             //시간이 좀 오래걸립니다. loading뷰 등 추가하면 좋아요
-            lastResult.HR_result = output[0][0];
-            lastResult.RR_result = output[0][1];
-            lastResult.LF_HF_ratio = output[0][2];
-            lastResult.spo2_result = output[0][3];
+            lastResult.HR_result = output[0];
+            lastResult.RR_result = output[1];
+//            lastResult.LF_HF_ratio = output[0][2];
+//            lastResult.spo2_result = output[0][3];
 //            lastResult.sdnn_result = output[0][4];
 //            lastResult.SBP = output[0][5];
 //            lastResult.DBP = output[0][6];
