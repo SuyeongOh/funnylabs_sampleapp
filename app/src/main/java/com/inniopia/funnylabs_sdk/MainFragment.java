@@ -147,9 +147,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                  .build();
 
         mImageAnalysis.setAnalyzer(
-                 mFrontCameraExecutor, faceDetector::detectVideoFile);
-//        mImageAnalysis.setAnalyzer(
-//                mFrontCameraExecutor, faceDetector::detectLiveStreamFrame);
+                mFrontCameraExecutor, faceDetector::detectLiveStreamFrame);
         cameraProvider.unbindAll();
 
         try{

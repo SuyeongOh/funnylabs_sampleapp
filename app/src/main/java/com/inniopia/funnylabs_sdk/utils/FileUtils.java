@@ -1,4 +1,4 @@
-package com.inniopia.funnylabs_sdk;
+package com.inniopia.funnylabs_sdk.utils;
 
 import android.content.Context;
 

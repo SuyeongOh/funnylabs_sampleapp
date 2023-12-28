@@ -23,9 +23,10 @@ import androidx.annotation.NonNull;
 
 public class Vital {
     private Interpreter mPOSModule = null;
+    private VitalLagacy mVitalLagacy;
     private static final String POS_TFL_MODULE_NAME = "pos.tflite";
     private static final int VIDEO_FRAME_RATE = 30;
-    private final ResultVitalSign lastResult = new ResultVitalSign();
+    private ResultVitalSign lastResult = new ResultVitalSign();
 
     private static final int FACE_WIDTH = 50;
     private static final int FACE_HEIGHT = 50;
@@ -41,8 +42,12 @@ public class Vital {
     private final List<Long> mUtcTimeTempList = new ArrayList<>();
     private final float[] inputFloatArray = new float[BATCH_SIZE * 3 * FRAME_WINDOW_SIZE  * FACE_WIDTH * FACE_HEIGHT];
 
+    private static float totalR = 0f;
+    private static float totalG = 0f;
+    private static float totalB = 0f;
 
     public Vital(Context context) {
+        mVitalLagacy = new VitalLagacy();
         try {
             mPOSModule = new Interpreter(loadModelFile(context.getAssets()));
         } catch (Exception e) {
@@ -50,7 +55,11 @@ public class Vital {
         }
     }
 
-    public boolean calculatePOSVital(@NonNull FaceImageModel faceImageModel){
+    public boolean calculatePOSVital(@NonNull FaceImageModel faceImageModel, boolean activate_lagacy){
+        if(activate_lagacy) {
+            ResultVitalSign.vitalSignData = VitalLagacy.toResultVitalSign(mVitalLagacy.calculateVital(faceImageModel.bitmap));
+            return ResultVitalSign.vitalSignData.SBP != 0;
+        }
         Bitmap faceBitmap =
                 Bitmap.createScaledBitmap(faceImageModel.bitmap, FACE_WIDTH, FACE_HEIGHT, false);
         faceBitmap.getPixels(face_pixels, 0, FACE_WIDTH, 0, 0, FACE_WIDTH, FACE_HEIGHT);
