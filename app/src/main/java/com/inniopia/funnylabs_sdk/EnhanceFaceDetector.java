@@ -3,9 +3,12 @@ package com.inniopia.funnylabs_sdk;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
 import com.google.mediapipe.framework.image.MPImage;
@@ -14,6 +17,7 @@ import com.google.mediapipe.tasks.core.Delegate;
 import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetector;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
+import com.inniopia.funnylabs_sdk.utils.FileUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +29,7 @@ public class EnhanceFaceDetector {
     private static final String FACE_DETECTION_MODEL_NAME = "face_detection_short_range.tflite";
     private static final float threshold = Config.THRESHOLD_DEFAULT;
     private static final int currentDelegate = Config.DELEGATE_CPU;
-    private static final RunningMode runningMode = RunningMode.LIVE_STREAM;
+    private static final RunningMode runningMode = RunningMode.VIDEO;
 
     private DetectorListener mDetectorListener;
     private Context mContext;
@@ -61,8 +65,10 @@ public class EnhanceFaceDetector {
                     .setMinDetectionConfidence(threshold)
                     .setRunningMode(runningMode);
 
-            optionBuilder.setResultListener(this::returnLivestreamResult)
+            if(runningMode.equals(RunningMode.LIVE_STREAM)){
+                optionBuilder.setResultListener(this::returnLivestreamResult)
                     .setErrorListener(this::returnLivestreamError);
+            }
 
             FaceDetector.FaceDetectorOptions options = optionBuilder.build();
             faceDetector = FaceDetector.createFromOptions(mContext, options);
@@ -72,10 +78,15 @@ public class EnhanceFaceDetector {
         }
     }
 
-    public void detectVideoFile(ImageProxy imageProxy){
+    public void detectVideoFile(){
+        Vital vital = new Vital(mContext);
+        if(Video_Index >= 256) {
+            Log.d("result", "finish");
+            return;
+        }
         Uri videoUri = Uri.EMPTY;
         try{
-            videoUri = Uri.parse(FileUtils.assetFilePath(mContext, "subject_1.mp4"));
+            videoUri = Uri.parse(FileUtils.assetFilePath(mContext, "test_face_2_1.mp4"));
         } catch (Exception e){
             e.printStackTrace();
         }
@@ -90,13 +101,27 @@ public class EnhanceFaceDetector {
 
         ArrayList<FaceDetectorResult> resultList = new ArrayList<>();
 
-        long timestamp = Video_Index * 33;
-        Bitmap curFrame = retriever.getFrameAtTime(timestamp);
-        tempBitmap = curFrame;
-        Bitmap argb8888 = curFrame.copy(Bitmap.Config.ARGB_8888, false);
-        MPImage mpImage = new BitmapImageBuilder(argb8888).build();
-        detectAsync(mpImage, timestamp);
-        Video_Index++;
+        FaceImageModel faceImageModel = null;
+        for(int i = 0; i < 512; i++){
+            long timestamp = Video_Index * 33;
+            Bitmap curFrame = retriever.getFrameAtTime(timestamp);
+            tempBitmap = curFrame;
+            Bitmap argb8888 = curFrame.copy(Bitmap.Config.ARGB_8888, false);
+            MPImage mpImage = new BitmapImageBuilder(argb8888).build();
+            Video_Index++;
+            FaceDetectorResult result = faceDetector.detectForVideo(mpImage, timestamp);
+            RectF box = result.detections().get(0).boundingBox();
+
+            float x = box.right;
+            float start_x = box.left;
+            RectF rectF = new RectF(start_x, box.top, x, box.bottom);
+            Rect rect = new Rect();
+            rectF.round(rect);
+            Bitmap croppedFaceBitmap = Bitmap.createBitmap(curFrame, rect.left, rect.top, rect.width(), rect.height());
+            faceImageModel = new FaceImageModel(croppedFaceBitmap, timestamp);
+            vital.calculatePOSVital(faceImageModel, true);
+        }
+        firstFrame.getWidth();
     }
 
     public void detectLiveStreamFrame(ImageProxy imageProxy){
@@ -141,7 +166,6 @@ public class EnhanceFaceDetector {
                 error.getMessage(), 1
         );
     }
-
     public boolean isClosed(){
         return faceDetector == null;
     }

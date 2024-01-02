@@ -31,10 +31,10 @@ import uk.me.berndporr.iirj.Butterworth;
 import static java.lang.Math.abs;
 
 public class VitalLagacy {
-    private static final int BUFFER_SIZE = 100;
-    private static final int BPM_BUFFER_SIZE = 50;
-    private static final int BPM_CALCULATION_FREQUENCY = 32;
-    private static final int BP_CALCULATION_FREQUENCY = 500;
+    private static final int BUFFER_SIZE = 128;
+    private static final int BPM_BUFFER_SIZE = 32;
+    private static final int BPM_CALCULATION_FREQUENCY = 16;
+    private static final int BP_CALCULATION_FREQUENCY = 512;
     private static final int VIDEO_FRAME_RATE = 30;
 
     private static final int GAUSSIAN_W = 50;

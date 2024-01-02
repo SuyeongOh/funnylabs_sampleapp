@@ -69,14 +69,18 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
         super.onCreate(savedInstanceState);
         mBpmAnalysisViewModel = new BpmAnalysisViewModel(new Application(), requireContext());
 
-        mFrontCameraExecutor = Executors.newSingleThreadExecutor();
+        faceDetector = new EnhanceFaceDetector(requireContext(), this);
+        faceDetector.setupFaceDetector();
+        faceDetector.detectVideoFile();
 
-        mFrontCameraExecutor.execute(
-                () -> {
-                    faceDetector = new EnhanceFaceDetector(requireContext(), this);
-                    faceDetector.setupFaceDetector();
-                }
-        );
+//        mFrontCameraExecutor = Executors.newSingleThreadExecutor();
+//
+//        mFrontCameraExecutor.execute(
+//                () -> {
+//                    faceDetector = new EnhanceFaceDetector(requireContext(), this);
+//                    faceDetector.setupFaceDetector();
+//                }
+//        );
 
 
     }

@@ -24,7 +24,7 @@ public class BpmAnalysisViewModel extends AndroidViewModel {
     }
 
     private void calculateAnalysis(@NonNull FaceImageModel faceImageModel){
-        if(!vital.calculatePOSVital(faceImageModel, true)){
+        if(!vital.calculatePOSVital(faceImageModel, false)){
             return;
         }
         Intent intent = new Intent(mContext, ResultActivity.class);

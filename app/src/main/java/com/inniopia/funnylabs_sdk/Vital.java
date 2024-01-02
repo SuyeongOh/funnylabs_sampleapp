@@ -34,13 +34,13 @@ public class Vital {
     int l = (int)(VIDEO_FRAME_RATE * 1.6);
 
     static final int FACE_PIXEL_COUNT = FACE_WIDTH * FACE_HEIGHT;
-    static final int FRAME_PIXEL_COUNT = FACE_PIXEL_COUNT * 3;
+    static final int FRAME_PIXEL_COUNT = 1 * 3;
     public static final int BATCH_SIZE = 1;
-    public static final int FRAME_WINDOW_SIZE = 512;
+    public static final int FRAME_WINDOW_SIZE = 256;
     private final int[] face_pixels = new int[FACE_PIXEL_COUNT];
 
     private final List<Long> mUtcTimeTempList = new ArrayList<>();
-    private final float[] inputFloatArray = new float[BATCH_SIZE * 3 * FRAME_WINDOW_SIZE  * FACE_WIDTH * FACE_HEIGHT];
+    private final float[] inputFloatArray = new float[BATCH_SIZE * 3 * FRAME_WINDOW_SIZE  * 1 * 1];
 
     private static float totalR = 0f;
     private static float totalG = 0f;
@@ -70,29 +70,40 @@ public class Vital {
             float g = ((c >> 8) & 0xff) / 255.0f;
             float b = ((c) & 0xff) / 255.0f;
 
-            try{
-                inputFloatArray[pixelOffset + 3 * i] = r;
-                inputFloatArray[pixelOffset + 3 * i + 1] = g;
-                inputFloatArray[pixelOffset + 3 * i + 2] = b;
-            } catch (Exception e){e.printStackTrace();
-
-            }
+//            try{
+//                inputFloatArray[pixelOffset + 3 * i] = r;
+//                inputFloatArray[pixelOffset + 3 * i + 1] = g;
+//                inputFloatArray[pixelOffset + 3 * i + 2] = b;
+//            } catch (Exception e){e.printStackTrace();
+//
+//            }
+            totalR += r;
+            totalG += g;
+            totalB += b;
         }
+
+        inputFloatArray[pixelOffset] = totalR/FACE_PIXEL_COUNT;
+        inputFloatArray[pixelOffset + 1] = totalG/FACE_PIXEL_COUNT;
+        inputFloatArray[pixelOffset + 2] = totalB/FACE_PIXEL_COUNT;
+        totalR = 0;
+        totalG = 0;
+        totalB = 0;
 
         mUtcTimeTempList.add(faceImageModel.frameUtcTimeMs);
 
         if (mUtcTimeTempList.size() == FRAME_WINDOW_SIZE * BATCH_SIZE) {
-            FloatBuffer buffer = FloatBuffer.allocate(BATCH_SIZE * 3 * FRAME_WINDOW_SIZE  * FACE_HEIGHT * FACE_WIDTH);
+
+            FloatBuffer buffer = FloatBuffer.allocate(BATCH_SIZE * FRAME_WINDOW_SIZE  * FRAME_PIXEL_COUNT);
             buffer.put(inputFloatArray);
             buffer.rewind();
 
 //            float[][] output = new float[1][257];
-            float[] output = new float[257];
+            float[] output = new float[1];
             mPOSModule.run(buffer, output);
 
             //시간이 좀 오래걸립니다. loading뷰 등 추가하면 좋아요
             lastResult.HR_result = output[0];
-            lastResult.RR_result = output[1];
+//            lastResult.RR_result = output[1];
 //            lastResult.LF_HF_ratio = output[0][2];
 //            lastResult.spo2_result = output[0][3];
 //            lastResult.sdnn_result = output[0][4];
