@@ -96,7 +96,7 @@ public class VitalLagacy {
         f_pixel_buff[1][bufferIndex]= Float.parseFloat(String.valueOf(totalG));
         f_pixel_buff[2][bufferIndex]= Float.parseFloat(String.valueOf(totalB));
 
-        if (bufferIndex % BPM_CALCULATION_FREQUENCY == BPM_CALCULATION_FREQUENCY - 1) {
+        if (bufferIndex % BPM_CALCULATION_FREQUENCY == 0) {
             double[] pre_processed = preprocessing(f_pixel_buff,false);
             bpm_Buffer[bpm_buffer_index] = (get_HR(pre_processed,BUFFER_SIZE));
             rr_Buffer[bpm_buffer_index] = (get_RR(pre_processed,BUFFER_SIZE));
@@ -129,8 +129,6 @@ public class VitalLagacy {
                 lastResult.spo2_result = 0;
             }
             lastResult.spo2_result = Math.round(lastResult.spo2_result);
-
-
         }
         if ((bufferIndex % BP_CALCULATION_FREQUENCY) == (BP_CALCULATION_FREQUENCY - 1)) {
             double[] preprocessed_g = get_normG(f_pixel_buff[1]);

@@ -86,7 +86,7 @@ public class EnhanceFaceDetector {
         }
         Uri videoUri = Uri.EMPTY;
         try{
-            videoUri = Uri.parse(FileUtils.assetFilePath(mContext, "test_face_2_1.mp4"));
+            videoUri = Uri.parse(FileUtils.assetFilePath(mContext, "test_face_3_80.mp4"));
         } catch (Exception e){
             e.printStackTrace();
         }
@@ -119,8 +119,9 @@ public class EnhanceFaceDetector {
             rectF.round(rect);
             Bitmap croppedFaceBitmap = Bitmap.createBitmap(curFrame, rect.left, rect.top, rect.width(), rect.height());
             faceImageModel = new FaceImageModel(croppedFaceBitmap, timestamp);
-            vital.calculatePOSVital(faceImageModel, true);
+            vital.calculatePOSVital(faceImageModel, false);
         }
+        //debug용 쓸모없는 코드
         firstFrame.getWidth();
     }
 

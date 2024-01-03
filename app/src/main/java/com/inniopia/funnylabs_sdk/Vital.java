@@ -23,8 +23,16 @@ import androidx.annotation.NonNull;
 
 public class Vital {
     private Interpreter mPOSModule = null;
+    private Interpreter[] MODULE_STEP = new Interpreter[4];
     private VitalLagacy mVitalLagacy;
-    private static final String POS_TFL_MODULE_NAME = "pos.tflite";
+    private static final String POS_TFL_MODULE_NAME = "2sr.tflite";
+    private static final String[] TFL_MODULE_NAME_STEP_LIST = new String[]{
+            "transpose.tflite",
+            "smoothing.tflite",
+            "detrend.tflite",
+            "fft.tflite",
+    };
+
     private static final int VIDEO_FRAME_RATE = 30;
     private ResultVitalSign lastResult = new ResultVitalSign();
 
@@ -36,7 +44,7 @@ public class Vital {
     static final int FACE_PIXEL_COUNT = FACE_WIDTH * FACE_HEIGHT;
     static final int FRAME_PIXEL_COUNT = 1 * 3;
     public static final int BATCH_SIZE = 1;
-    public static final int FRAME_WINDOW_SIZE = 256;
+    public static final int FRAME_WINDOW_SIZE = 512;
     private final int[] face_pixels = new int[FACE_PIXEL_COUNT];
 
     private final List<Long> mUtcTimeTempList = new ArrayList<>();
@@ -49,7 +57,10 @@ public class Vital {
     public Vital(Context context) {
         mVitalLagacy = new VitalLagacy();
         try {
-            mPOSModule = new Interpreter(loadModelFile(context.getAssets()));
+            mPOSModule = new Interpreter(loadModelFile(context.getAssets(), POS_TFL_MODULE_NAME));
+            for(int i = 0; i < TFL_MODULE_NAME_STEP_LIST.length; i++){
+                MODULE_STEP[i] = new Interpreter(loadModelFile(context.getAssets(), TFL_MODULE_NAME_STEP_LIST[i]));
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -72,10 +83,11 @@ public class Vital {
 
 //            try{
 //                inputFloatArray[pixelOffset + 3 * i] = r;
+
 //                inputFloatArray[pixelOffset + 3 * i + 1] = g;
 //                inputFloatArray[pixelOffset + 3 * i + 2] = b;
-//            } catch (Exception e){e.printStackTrace();
-//
+//            } catch (Exception e){
+//            e.printStackTrace();
 //            }
             totalR += r;
             totalG += g;
@@ -98,11 +110,36 @@ public class Vital {
             buffer.rewind();
 
 //            float[][] output = new float[1][257];
-            float[] output = new float[1];
-            mPOSModule.run(buffer, output);
+            //float[] output = new float[1];
+            //mPOSModule.run(buffer, output);
+            float[][] output1 = new float[3][512];
+            MODULE_STEP[0].run(buffer, output1);
+            float[] output2 = new float[508];
+            MODULE_STEP[1].run(output1, output2);
+            MODULE_STEP[2].run(output2, output2);
+            float[] output3 = new float[257];
+            MODULE_STEP[3].run(output2, output3);
+            int a = output3.length;
 
+            int max_index = 0;
+            float max_val = 0;
+            float filter_interval = 30 / (float)257;
+            for( int i =0 ; i < output3.length ; i++){
+                if( i * filter_interval < 0.7 )
+                    continue;
+                else if( i * filter_interval > 2.2){
+                    break;
+                }
+                else{
+                    if( output3[i] > max_val ) {
+                        max_val = (float) output3[i];
+                        max_index = i;
+                    }
+                }
+            }
+            float hr = max_index * filter_interval * 60;
             //시간이 좀 오래걸립니다. loading뷰 등 추가하면 좋아요
-            lastResult.HR_result = output[0];
+//            lastResult.HR_result = output[0];
 //            lastResult.RR_result = output[1];
 //            lastResult.LF_HF_ratio = output[0][2];
 //            lastResult.spo2_result = output[0][3];
@@ -122,9 +159,9 @@ public class Vital {
         }
     }
 
-    private ByteBuffer loadModelFile(AssetManager assets)
+    private ByteBuffer loadModelFile(AssetManager assets, String module)
             throws IOException {
-        AssetFileDescriptor fileDescriptor = assets.openFd(POS_TFL_MODULE_NAME);
+        AssetFileDescriptor fileDescriptor = assets.openFd(module);
         FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
         FileChannel fileChannel = inputStream.getChannel();
         long startOffset = fileDescriptor.getStartOffset();
