@@ -9,4 +9,9 @@ public class Config {
 
     public static final String TYPE_OF_BIG = "big";
     public static final String TYPE_OF_SMALL = "small";
+
+    public static int SCREEN_WIDTH = 0;
+    public static int SCREEN_HEIGHT = 0;
+
+    public static double USER_BMI = 0f;
 }

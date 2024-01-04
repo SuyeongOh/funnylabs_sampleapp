@@ -12,14 +12,13 @@ import android.util.Log;
 
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
 import com.google.mediapipe.framework.image.MPImage;
+import com.google.mediapipe.tasks.components.containers.NormalizedKeypoint;
 import com.google.mediapipe.tasks.core.BaseOptions;
 import com.google.mediapipe.tasks.core.Delegate;
 import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetector;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
 import com.inniopia.funnylabs_sdk.utils.FileUtils;
-
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,7 +28,7 @@ public class EnhanceFaceDetector {
     private static final String FACE_DETECTION_MODEL_NAME = "face_detection_short_range.tflite";
     private static final float threshold = Config.THRESHOLD_DEFAULT;
     private static final int currentDelegate = Config.DELEGATE_CPU;
-    private static final RunningMode runningMode = RunningMode.VIDEO;
+    private static final RunningMode runningMode = RunningMode.LIVE_STREAM;
 
     private DetectorListener mDetectorListener;
     private Context mContext;
@@ -94,35 +93,32 @@ public class EnhanceFaceDetector {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         retriever.setDataSource(mContext, videoUri);
 
-        Bitmap firstFrame = retriever.getFrameAtTime(0);
-
-        int width = firstFrame.getWidth();
-        int height = firstFrame.getHeight();
-
-        ArrayList<FaceDetectorResult> resultList = new ArrayList<>();
-
         FaceImageModel faceImageModel = null;
+
+        int width = retriever.getFrameAtIndex(0).getWidth();
+
         for(int i = 0; i < 512; i++){
-            long timestamp = Video_Index * 33;
-            Bitmap curFrame = retriever.getFrameAtTime(timestamp);
+            Bitmap curFrame = retriever.getFrameAtIndex(i);
             tempBitmap = curFrame;
             Bitmap argb8888 = curFrame.copy(Bitmap.Config.ARGB_8888, false);
             MPImage mpImage = new BitmapImageBuilder(argb8888).build();
-            Video_Index++;
-            FaceDetectorResult result = faceDetector.detectForVideo(mpImage, timestamp);
+            FaceDetectorResult result = faceDetector.detectForVideo(mpImage, i*33);
             RectF box = result.detections().get(0).boundingBox();
+            List<NormalizedKeypoint> keypoint = result.detections().get(0).keypoints().get();
+            float left = keypoint.get(4).x() * width;
+            float right = keypoint.get(5).x() * width;
 
-            float x = box.right;
-            float start_x = box.left;
-            RectF rectF = new RectF(start_x, box.top, x, box.bottom);
+            float top = box.top;
+            float bottom = box.bottom;
+
+            RectF rectF = new RectF(left, top, right, bottom);
             Rect rect = new Rect();
             rectF.round(rect);
             Bitmap croppedFaceBitmap = Bitmap.createBitmap(curFrame, rect.left, rect.top, rect.width(), rect.height());
-            faceImageModel = new FaceImageModel(croppedFaceBitmap, timestamp);
+            faceImageModel = new FaceImageModel(croppedFaceBitmap, 0);
             vital.calculatePOSVital(faceImageModel, false);
         }
-        //debug용 쓸모없는 코드
-        firstFrame.getWidth();
+        long time = faceImageModel.frameUtcTimeMs;
     }
 
     public void detectLiveStreamFrame(ImageProxy imageProxy){

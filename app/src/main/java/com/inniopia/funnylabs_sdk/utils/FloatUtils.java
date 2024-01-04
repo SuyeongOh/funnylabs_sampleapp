@@ -12,4 +12,12 @@ public class FloatUtils {
     public static float mean(float[] array){
         return sum(array)/ array.length;
     }
+
+    public static double[] floatArrayToDoubleArray (float[] array){
+        double[] ret = new double[array.length];
+        for(int i = 0; i < array.length; i++){
+            ret[i] = array[i];
+        }
+        return ret;
+    }
 }
