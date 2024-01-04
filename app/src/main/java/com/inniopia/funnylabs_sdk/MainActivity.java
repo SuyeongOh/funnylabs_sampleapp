@@ -27,11 +27,21 @@ public class MainActivity extends FragmentActivity {
 
         requestPermissions(LIST_NEW_SDK_PERMISSION, 1);
 
-        MainFragment fragment = new MainFragment();
+        InitFragment fragment = new InitFragment();
         getSupportFragmentManager().beginTransaction()
                 .add(R.id.fragmentContainerView, fragment)
                 .commit();
     }
 
-
+    public void replaceFragment(Fragment fragment){
+        getSupportFragmentManager().popBackStack();
+        getSupportFragmentManager().beginTransaction()
+                .add(R.id.fragmentContainerView, fragment)
+                .commit();
+    }
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        finish();
+    }
 }
