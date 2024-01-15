@@ -34,14 +34,14 @@ import uk.me.berndporr.iirj.Butterworth;
 import static java.lang.Math.abs;
 
 public class VitalLagacy {
-    private static final int BUFFER_SIZE = 512;
-    private static final int BPM_BUFFER_SIZE = 8;
-    private static final int BPM_CALCULATION_FREQUENCY = 64;
-    private static final int BP_CALCULATION_FREQUENCY = 512;
+    private static final int BUFFER_SIZE = 100;
+    private static final int BPM_BUFFER_SIZE = 30;
+    private static final int BPM_CALCULATION_FREQUENCY = 15;
+    private static final int BP_CALCULATION_FREQUENCY = 450;
     public static int VIDEO_FRAME_RATE = 30;
 
-    private static final int GAUSSIAN_W = 50;
-    private static final int DETREND_POWER = 6;
+    private static final int GAUSSIAN_W = 1;
+    private static final String DETREND_POWER = "constant";
 
     public static class Result {
         public float LF_HF_ratio = 0;
@@ -107,7 +107,7 @@ public class VitalLagacy {
 
         if (bufferIndex % BPM_CALCULATION_FREQUENCY == BPM_CALCULATION_FREQUENCY - 1) {
             lastFrameTime = model.frameUtcTimeMs;
-            VIDEO_FRAME_RATE = 1000 / (int)((lastFrameTime - firstFrameTime) / pixelIndex);
+            //VIDEO_FRAME_RATE = 1000 / (int)((lastFrameTime - firstFrameTime) / pixelIndex);
             double[] pre_processed = preprocessing(f_pixel_buff,false);
             bpm_Buffer[bpm_buffer_index] = (get_HR(pre_processed,BUFFER_SIZE));
             rr_Buffer[bpm_buffer_index] = (get_RR(pre_processed,BUFFER_SIZE));
@@ -166,7 +166,7 @@ public class VitalLagacy {
     public double[] preprocessing(double[][] pixel, boolean ica_flag){
 
         String mode = "rectangular";
-        int wsize = 4;
+        int wsize = 5;
 
         Smooth g = new Smooth(pixel[1], wsize, mode);
         double[] s_g = g.smoothSignal();
