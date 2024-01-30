@@ -1,7 +1,6 @@
 package com.inniopia.funnylabs_sdk;
 
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.util.Log;
 
 import com.github.psambit9791.jdsp.signal.Detrend;
@@ -10,21 +9,14 @@ import com.github.psambit9791.jdsp.signal.peaks.FindPeak;
 import com.github.psambit9791.jdsp.signal.peaks.Peak;
 import com.github.psambit9791.jdsp.transform.DiscreteFourier;
 import com.github.psambit9791.jdsp.transform.Hilbert;
+import com.inniopia.funnylabs_sdk.bvp.BandPassFilter;
 import com.inniopia.funnylabs_sdk.data.ResultVitalSign;
 import com.inniopia.funnylabs_sdk.utils.FloatUtils;
 import com.paramsen.noise.Noise;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
-import jsat.SimpleDataSet;
-import jsat.classifiers.CategoricalData;
-import jsat.classifiers.DataPoint;
-import jsat.datatransform.FastICA;
-import jsat.datatransform.WhitenedPCA;
-import jsat.datatransform.ZeroMeanTransform;
 import jsat.linear.DenseMatrix;
 import jsat.linear.DenseVector;
 import jsat.linear.Matrix;
@@ -35,13 +27,14 @@ import static java.lang.Math.abs;
 
 public class VitalLagacy {
     private static final int BUFFER_SIZE = 512;
-    private static final int BPM_BUFFER_SIZE = 8;
-    private static final int BPM_CALCULATION_FREQUENCY = 64;
+    private static final int BPM_BUFFER_SIZE = 1;
+    private static final int BPM_CALCULATION_FREQUENCY = 512;
     private static final int BP_CALCULATION_FREQUENCY = 512;
     public static int VIDEO_FRAME_RATE = 30;
 
-    private static final int GAUSSIAN_W = 50;
+    private static final int GAUSSIAN_W = 72;
     private static final int DETREND_POWER = 6;
+    private long[] frameTimeArray = new long[BUFFER_SIZE];
 
     public static class Result {
         public float LF_HF_ratio = 0;
@@ -80,10 +73,12 @@ public class VitalLagacy {
         //rescale: resizez + gaussian
         if(pixelIndex == 0) firstFrameTime = model.frameUtcTimeMs;
 
+        frameTimeArray[bufferIndex] = model.frameUtcTimeMs;
+
         Bitmap bitmap = model.bitmap;
         Bitmap test_cropped = Bitmap.createScaledBitmap(bitmap, GAUSSIAN_W, GAUSSIAN_W, false); //Gaussian pyramid 2단계 50x50 resize
 
-        int totalR = 0, totalG = 0, totalB = 0;
+        float totalR = 0, totalG = 0, totalB = 0;
         for(int i = 0; i < GAUSSIAN_W; i++){
             for(int j = 0; j< GAUSSIAN_W; j++){
                 int pixels_buffer = test_cropped.getPixel(i,j);
@@ -97,9 +92,9 @@ public class VitalLagacy {
                 totalB += b;
             }
         }
-        totalR = totalR / (GAUSSIAN_W * GAUSSIAN_W);
-        totalG = totalG / (GAUSSIAN_W * GAUSSIAN_W);
-        totalB = totalB / (GAUSSIAN_W * GAUSSIAN_W);
+        totalR = totalR / (float)(GAUSSIAN_W * GAUSSIAN_W);
+        totalG = totalG / (float)(GAUSSIAN_W * GAUSSIAN_W);
+        totalB = totalB / (float)(GAUSSIAN_W * GAUSSIAN_W);
 
         f_pixel_buff[0][bufferIndex]= Float.parseFloat(String.valueOf(totalR));
         f_pixel_buff[1][bufferIndex]= Float.parseFloat(String.valueOf(totalG));
@@ -107,8 +102,8 @@ public class VitalLagacy {
 
         if (bufferIndex % BPM_CALCULATION_FREQUENCY == BPM_CALCULATION_FREQUENCY - 1) {
             lastFrameTime = model.frameUtcTimeMs;
-            VIDEO_FRAME_RATE = 1000 / (int)((lastFrameTime - firstFrameTime) / pixelIndex);
-            double[] pre_processed = preprocessing(f_pixel_buff,false);
+            //VIDEO_FRAME_RATE = 1000 / (int)((lastFrameTime - firstFrameTime) / pixelIndex);
+            double[] pre_processed = preprocessing(f_pixel_buff);
             bpm_Buffer[bpm_buffer_index] = (get_HR(pre_processed,BUFFER_SIZE));
             rr_Buffer[bpm_buffer_index] = (get_RR(pre_processed,BUFFER_SIZE));
             bpm_buffer_index = (bpm_buffer_index + 1) % BPM_BUFFER_SIZE;
@@ -117,20 +112,15 @@ public class VitalLagacy {
                 bpm[0] += bpm_Buffer[i];
                 rr[0] += rr_Buffer[i];
                 if (bpm_Buffer[i] == 0.0f && rr_Buffer[i] == 0.0f) {
-                    Log.d("BPM",""+i);
                     break;
                 }
             }
-            Log.d("BPM", "" + bpm[0] /i + "cnt" + i);
-            Log.d("BPM", "RR" + rr[0] /i + "cnt" + i);
-
             lastResult.HR_result = Math.round(bpm[0] /(i));
             lastResult.RR_result = Math.round(rr[0] /(i));
-
             //--------SDNN --------------------//
-            lastResult.sdnn_result = SDNN(bpm_Buffer, bpm_buffer_index);
-            lastResult.sdnn_result = Math.round(lastResult.sdnn_result * 100) / 100.0;
-            lastResult.sdnn_result = lastResult.sdnn_result * 100;
+//            lastResult.sdnn_result = SDNN(bpm_Buffer, bpm_buffer_index);
+//            lastResult.sdnn_result = Math.round(lastResult.sdnn_result * 100) / 100.0;
+//            lastResult.sdnn_result = lastResult.sdnn_result * 100;
             //--------SDNN --------------------//
             lastResult.LF_HF_ratio = LF_HF_ratio(pre_processed,BUFFER_SIZE);
 
@@ -140,7 +130,6 @@ public class VitalLagacy {
                 lastResult.spo2_result = 0;
             }
             lastResult.spo2_result = Math.round(lastResult.spo2_result);
-            Log.d("jupiter", Arrays.toString(bpm_Buffer));
         }
         if ((pixelIndex % BP_CALCULATION_FREQUENCY) == (BP_CALCULATION_FREQUENCY - 1)) {
             double[] preprocessed_g = get_normG(f_pixel_buff[1]);
@@ -163,76 +152,55 @@ public class VitalLagacy {
         return lastResult;
     }
 
-    public double[] preprocessing(double[][] pixel, boolean ica_flag){
+    public double[] preprocessing(double[][] pixel){
 
         String mode = "rectangular";
         int wsize = 4;
 
-        Smooth g = new Smooth(pixel[1], wsize, mode);
-        double[] s_g = g.smoothSignal();
-        Detrend d2 = new Detrend(s_g,DETREND_POWER);
+
+        double[][] smoothPixel = new double[pixel.length][pixel[0].length];
+        double[] doubleTimeArray = new double[frameTimeArray.length];
+        smoothPixel[0] = new Smooth(pixel[0], wsize, mode).smoothSignal();
+        smoothPixel[1] = new Smooth(pixel[1], wsize, mode).smoothSignal();
+        smoothPixel[2] = new Smooth(pixel[2], wsize, mode).smoothSignal();
+
+        for(int i = 0; i < frameTimeArray.length; i++){
+            doubleTimeArray[i] = frameTimeArray[i];
+        }
+        double[] timeSmoothing = new Smooth(doubleTimeArray, wsize, mode).smoothSignal();
+
+        Vec v = new DenseVector(1);
+        v.mutableAdd(1);
+
+        DenseMatrix signal = new DenseMatrix(smoothPixel);
+
+        Matrix[] qr = signal.qr();
+        Matrix q = qr[0];
+
+        Vec sVec = q.getColumn(0);
+
+        DenseMatrix S = new DenseMatrix(v, sVec);
+
+        DenseMatrix identify = DenseMatrix.eye(3);
+        Matrix P = identify.subtract(S.transpose().multiply(S));
+
+        Matrix Y = P.multiply(signal);
+
+        Vec bvpVec = Y.getRow(1);
+
+
+        Detrend d2 = new Detrend(bvpVec.arrayCopy(), DETREND_POWER);
         double[] d_g = d2.detrendSignal();
 
-        Vec v_g = DenseVector.toDenseVec(d_g);
-        v_g = v_g.subtract(v_g.mean());
-        v_g = v_g.divide(v_g.standardDeviation());
 
-        if(ica_flag) {
+        BandPassFilter bpf = new BandPassFilter(Config.MAX_FREQUENCY, Config.MIN_FREQUENCY);
 
-            // window size = 5 smoothing, remove glitch
-            Smooth r = new Smooth(pixel[0], wsize, mode);
-            Smooth b = new Smooth(pixel[2], wsize, mode);
-            double[] s_r = r.smoothSignal();
-            double[] s_b = b.smoothSignal();
-
-            Detrend d1 = new Detrend(s_r, DETREND_POWER);
-            Detrend d3 = new Detrend(s_b, DETREND_POWER);
-            double[] d_r = d1.detrendSignal();
-            double[] d_b = d3.detrendSignal();
-
-            Vec v_r = DenseVector.toDenseVec(d_r);
-            Vec v_b = DenseVector.toDenseVec(d_b);
-            v_r = v_r.subtract(v_r.mean());
-            v_r = v_r.divide(v_r.standardDeviation());
-            v_b = v_b.subtract(v_b.mean());
-            v_b = v_b.divide(v_b.standardDeviation());
-
-
-            SimpleDataSet source = new SimpleDataSet(new CategoricalData[0], 3);
-            SimpleDataSet X = new SimpleDataSet(new CategoricalData[0], 3);
-
-            Matrix mixing_true = new DenseMatrix(new double[][]{
-                    {1, 1, 1},
-                    {0.5, 2, 1},
-                    {1.5, 1, 2}
-            });
-
-            for (int i = 0; i < d_r.length; i++) {
-                Vec s = DenseVector.toDenseVec(v_r.get(i), v_g.get(i), v_b.get(i));
-                source.add(new DataPoint(s));
-                X.add(new DataPoint(s.multiply(mixing_true.transpose())));
-            }
-
-            ZeroMeanTransform zeroMean = new ZeroMeanTransform(X);
-            X.applyTransform(zeroMean);
-            WhitenedPCA whitten = new WhitenedPCA(X);
-            X.applyTransform(whitten);
-
-            SimpleDataSet origX = X.shallowClone();
-            FastICA ica = new FastICA(X, 3, FastICA.DefaultNegEntropyFunc.LOG_COSH, true);
-
-            X.applyTransform(ica);
-            Vec col_2 = X.getNumericColumn(1);
-
-            double[] comp2 = col_2.arrayCopy();
-
-            DiscreteFourier fft_r = new DiscreteFourier(comp2);
-            fft_r.dft();
-
-            return fft_r.returnAbsolute(true);
+        double[] bpf_signal = new double[d_g.length];
+        for(int i = 1; i < d_g.length; i++){
+            bpf_signal[i] = bpf.filter(d_g[i], timeSmoothing[i] - timeSmoothing[i - 1]);
         }
 
-        DiscreteFourier fft_r = new DiscreteFourier(v_g.arrayCopy());
+        DiscreteFourier fft_r = new DiscreteFourier(bpf_signal);
         fft_r.dft();
 
         return fft_r.returnAbsolute(true);
@@ -637,5 +605,13 @@ public class VitalLagacy {
             }
         }
         return adjustPixel;
+    }
+
+    public void clearAnalysis(){
+        firstFrameTime = 0;
+        lastFrameTime = 0;
+        bufferIndex = 0;
+        pixelIndex = 0;
+        bpm_buffer_index = 0;
     }
 }

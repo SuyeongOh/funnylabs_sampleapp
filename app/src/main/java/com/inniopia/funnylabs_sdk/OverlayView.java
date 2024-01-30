@@ -8,6 +8,7 @@ import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import com.google.mediapipe.tasks.components.containers.Detection;
@@ -25,9 +26,9 @@ public class OverlayView extends View {
     private Float scaleFactorHeight = 1f;
     private Rect bounds;
 
-    private static final int FULL_SIZE_OF_WIDTH = 720;
-    private static final int FULL_SIZE_OF_HEIGHT = 1280;
-    private static final int FULL_SIZE_OF_DETECTION = FULL_SIZE_OF_WIDTH * FULL_SIZE_OF_HEIGHT;
+    private static int FULL_SIZE_OF_WIDTH = 720;
+    private static int FULL_SIZE_OF_HEIGHT = 1280;
+    private static int FULL_SIZE_OF_DETECTION = FULL_SIZE_OF_WIDTH * FULL_SIZE_OF_HEIGHT;
     //popup의 민감도를 바꾸려면 이부분을 바꾸세요.
 
     private float STANDARD_BIG_SIZE_OF_POPUP = 1f/2f;
@@ -60,18 +61,6 @@ public class OverlayView extends View {
                 @SuppressLint("DrawAllocation") //warning 방지 없어도 무관함
                 RectF drawRect = new RectF(realLeft, realTop, realRight, realBottom);
                 canvas.drawRect(drawRect, boxPaint);
-
-                Path facePath = new Path();
-                int width = getWidth();
-                int height = getHeight();
-                facePath.lineTo(keypointList.get(5).x() * width, keypointList.get(5).y() * height);
-                facePath.lineTo(keypointList.get(3).x() * width, keypointList.get(3).y() * height);
-                facePath.lineTo(keypointList.get(4).x() * width, keypointList.get(4).y() * height);
-                facePath.lineTo(keypointList.get(5).x() * width, keypointList.get(5).y() * height);
-
-                canvas.clipPath(facePath);
-                canvas.drawPath(facePath, boxPaint);
-
                 if(isClear){
                     isClear = false;
                 }
@@ -103,6 +92,10 @@ public class OverlayView extends View {
         boxPaint.setStyle(Paint.Style.STROKE);
     }
 
+    public void setFullsize(int width, int height){
+        FULL_SIZE_OF_WIDTH = width;
+        FULL_SIZE_OF_HEIGHT = height;
+    }
     public boolean isBigSize(RectF bBox){
         //bBox는 현재 1280x720 기준으로 동작하기 때문에 해당 사이즈에 맞게 값을 설정해줘야함
         return !(bBox.width() * bBox.height() < FULL_SIZE_OF_DETECTION * STANDARD_BIG_SIZE_OF_POPUP);
@@ -113,6 +106,7 @@ public class OverlayView extends View {
     }
 
     public boolean isOutBoundary(RectF bBox){
+        Log.d("Jupiter", "FULL SIZE : " + FULL_SIZE_OF_WIDTH + ", " + FULL_SIZE_OF_HEIGHT);
         return (bBox.left + bBox.width() > FULL_SIZE_OF_WIDTH)
                 || bBox.top + bBox.height() > FULL_SIZE_OF_HEIGHT;
     }

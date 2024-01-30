@@ -120,4 +120,15 @@ public class Vital {
         long declaredLength = fileDescriptor.getDeclaredLength();
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
     }
+
+    public void clearAnalysis(){
+        mVitalLagacy.clearAnalysis();
+        totalR = 0f;
+        totalG = 0f;
+        totalB = 0f;
+        mUtcTimeTempList.clear();
+    }
+    public VitalLagacy getVitalLagacy() {
+        return mVitalLagacy;
+    }
 }

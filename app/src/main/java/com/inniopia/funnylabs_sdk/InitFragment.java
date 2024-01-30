@@ -36,7 +36,12 @@ public class InitFragment extends Fragment {
             @Override
             public void onClick(View v) {
                 String bmi = bmiInputView.getText().toString();
-                Config.USER_BMI = Double.parseDouble(bmi);
+                try{
+                    Config.USER_BMI = Double.parseDouble(bmi);
+                } catch (Exception e){
+                    Config.USER_BMI = 20.1f;
+                }
+
 
                 if(cameraDirectionSwitch.isChecked()){
                     Config.USE_CAMERA_DIRECTION = Config.CAMERA_DIRECTION_BACK;

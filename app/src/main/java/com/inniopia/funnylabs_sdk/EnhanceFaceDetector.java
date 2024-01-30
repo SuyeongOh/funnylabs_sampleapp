@@ -3,22 +3,16 @@ package com.inniopia.funnylabs_sdk;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
-import android.graphics.Rect;
-import android.graphics.RectF;
-import android.media.MediaMetadataRetriever;
-import android.net.Uri;
 import android.os.SystemClock;
-import android.util.Log;
 
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
 import com.google.mediapipe.framework.image.MPImage;
-import com.google.mediapipe.tasks.components.containers.NormalizedKeypoint;
 import com.google.mediapipe.tasks.core.BaseOptions;
 import com.google.mediapipe.tasks.core.Delegate;
 import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetector;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
-import com.inniopia.funnylabs_sdk.utils.FileUtils;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -33,8 +27,7 @@ public class EnhanceFaceDetector {
     private DetectorListener mDetectorListener;
 
     private Context mContext;
-    private Bitmap tempBitmap;
-
+    private Bitmap originalBitmap;
     private FaceDetector faceDetector;
 
     private static int Video_Index = 0;
@@ -78,50 +71,6 @@ public class EnhanceFaceDetector {
         }
     }
 
-    public void detectVideoFile(){
-        Vital vital = new Vital(mContext);
-        if(Video_Index >= 256) {
-            Log.d("result", "finish");
-            return;
-        }
-        Uri videoUri = Uri.EMPTY;
-        try{
-            videoUri = Uri.parse(FileUtils.assetFilePath(mContext, "test_face_3_80.mp4"));
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-
-        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        retriever.setDataSource(mContext, videoUri);
-
-        FaceImageModel faceImageModel = null;
-
-        int width = retriever.getFrameAtIndex(0).getWidth();
-
-        for(int i = 0; i < 512; i++){
-            Bitmap curFrame = retriever.getFrameAtIndex(i);
-            tempBitmap = curFrame;
-            Bitmap argb8888 = curFrame.copy(Bitmap.Config.ARGB_8888, false);
-            MPImage mpImage = new BitmapImageBuilder(argb8888).build();
-            FaceDetectorResult result = faceDetector.detectForVideo(mpImage, i*33);
-            RectF box = result.detections().get(0).boundingBox();
-            List<NormalizedKeypoint> keypoint = result.detections().get(0).keypoints().get();
-            float left = keypoint.get(4).x() * width;
-            float right = keypoint.get(5).x() * width;
-
-            float top = box.top;
-            float bottom = box.bottom;
-
-            RectF rectF = new RectF(left, top, right, bottom);
-            Rect rect = new Rect();
-            rectF.round(rect);
-            Bitmap croppedFaceBitmap = Bitmap.createBitmap(curFrame, rect.left, rect.top, rect.width(), rect.height());
-            faceImageModel = new FaceImageModel(croppedFaceBitmap, 0);
-            vital.calculatePOSVital(faceImageModel, false);
-        }
-        long time = faceImageModel.frameUtcTimeMs;
-    }
-
     public void detectLiveStreamFrame(ImageProxy imageProxy){
         long frametime = SystemClock.uptimeMillis();
 
@@ -137,13 +86,18 @@ public class EnhanceFaceDetector {
 
         Bitmap rotatedBitmap = Bitmap.createBitmap(buffer, 0, 0, buffer.getWidth(), buffer.getHeight(), matrix, true);
         MPImage mpImage = new BitmapImageBuilder(rotatedBitmap).build();
-        tempBitmap = rotatedBitmap;
+        originalBitmap = rotatedBitmap;
         detectAsync(mpImage, frametime);
     }
 
     public void detectAsync(MPImage mpImage, long frameTime){
         faceDetector.detectAsync(mpImage, frameTime);
     }
+    public void detectAsync(MPImage mpImage, Bitmap original, long frameTime){
+        originalBitmap = original;
+        faceDetector.detectAsync(mpImage, frameTime);
+    }
+
 
     private void returnLivestreamResult(FaceDetectorResult result, MPImage input){
         long finishTimeMs = SystemClock.uptimeMillis();
@@ -151,7 +105,7 @@ public class EnhanceFaceDetector {
 
         mDetectorListener.onResults(
                 input,
-                tempBitmap,
+                originalBitmap,
                 new ResultBundle(
                         Collections.singletonList(result),
                         inferencetime,

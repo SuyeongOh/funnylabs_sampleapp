@@ -19,15 +19,17 @@ public class BpmAnalysisViewModel extends AndroidViewModel {
         mContext = context;
     }
 
-    public void addFaceImageModel(@NonNull FaceImageModel faceImageModel){
-        calculateAnalysis(faceImageModel);
+    public boolean addFaceImageModel(@NonNull FaceImageModel faceImageModel){
+        return calculateAnalysis(faceImageModel);
     }
 
-    private void calculateAnalysis(@NonNull FaceImageModel faceImageModel){
-        if(!vital.calculatePOSVital(faceImageModel, true)){
-            return;
-        }
-        Intent intent = new Intent(mContext, ResultActivity.class);
-        mContext.startActivity(intent);
+    private boolean calculateAnalysis(@NonNull FaceImageModel faceImageModel){
+        return vital.calculatePOSVital(faceImageModel, true);
+    }
+    public void clearAnalysis(){
+        vital.clearAnalysis();
+    }
+    public Vital getVital() {
+        return vital;
     }
 }
