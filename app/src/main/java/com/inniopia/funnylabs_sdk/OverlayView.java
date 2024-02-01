@@ -31,7 +31,8 @@ public class OverlayView extends View {
     private static int FULL_SIZE_OF_DETECTION = FULL_SIZE_OF_WIDTH * FULL_SIZE_OF_HEIGHT;
     //popup의 민감도를 바꾸려면 이부분을 바꾸세요.
 
-    private float STANDARD_BIG_SIZE_OF_POPUP = 1f/2f;
+    private RectF predicisionBox = null;
+    private float STANDARD_BIG_SIZE_OF_POPUP = 3f/4f;
     private float STANDARD_SMALL_SIZE_OF_POPUP = 1f/9f;
 
     private boolean isClear = false;
@@ -46,21 +47,22 @@ public class OverlayView extends View {
 
         if(result != null) {
             if(result.detections().size() > 0){
-                Detection person = result.detections().get(0);
-                RectF boundingBox = person.boundingBox();
-
-                List<NormalizedKeypoint> keypointList = person.keypoints().get();
-//                float left = getWidth() * (keypointList.get(0).x() + keypointList.get(4).x()) / 2;
-//                float right = getWidth() * (keypointList.get(1).x() + keypointList.get(5).x()) / 2;
-
-                float realTop = boundingBox.top * scaleFactorHeight;
-                float realBottom = boundingBox.bottom * scaleFactorHeight;
-                float realLeft = boundingBox.left * scaleFactorWidth;
-                float realRight = boundingBox.right * scaleFactorWidth;
-
-                @SuppressLint("DrawAllocation") //warning 방지 없어도 무관함
-                RectF drawRect = new RectF(realLeft, realTop, realRight, realBottom);
-                canvas.drawRect(drawRect, boxPaint);
+                if(predicisionBox != null){
+                    canvas.drawRect(predicisionBox, boxPaint);
+                    predicisionBox = null;
+                }
+//                Detection person = result.detections().get(0);
+//                RectF boundingBox = person.boundingBox();
+//
+//                float realTop = boundingBox.top * scaleFactorHeight;
+//                float realBottom = boundingBox.bottom * scaleFactorHeight;
+//                float realLeft = boundingBox.left * scaleFactorWidth;
+//                float realRight = boundingBox.right * scaleFactorWidth;
+//
+//
+//                @SuppressLint("DrawAllocation") //warning 방지 없어도 무관함
+//                RectF drawRect = new RectF(realLeft, realTop, realRight, realBottom);
+//                canvas.drawRect(drawRect, boxPaint);
                 if(isClear){
                     isClear = false;
                 }
@@ -70,8 +72,18 @@ public class OverlayView extends View {
 
     public void setResults(FaceDetectorResult detectResult, int imageWidth, int imageHeight) {
         result = detectResult;
-        scaleFactorWidth = getWidth()/ (float)imageWidth;
-        scaleFactorHeight =  getHeight() / (float)imageHeight;
+
+        scaleFactorWidth = getWidth() / (float)imageWidth;
+        scaleFactorHeight = getHeight() / (float)imageHeight;
+
+        invalidate();
+    }
+
+    public void setResults(FaceDetectorResult detectResult, RectF box) {
+        result = detectResult;
+
+        predicisionBox = box;
+
         invalidate();
     }
 
@@ -107,7 +119,7 @@ public class OverlayView extends View {
 
     public boolean isOutBoundary(RectF bBox){
         Log.d("Jupiter", "FULL SIZE : " + FULL_SIZE_OF_WIDTH + ", " + FULL_SIZE_OF_HEIGHT);
-        return (bBox.left + bBox.width() > FULL_SIZE_OF_WIDTH)
+        return bBox.left + bBox.width() > FULL_SIZE_OF_WIDTH
                 || bBox.top + bBox.height() > FULL_SIZE_OF_HEIGHT;
     }
 }

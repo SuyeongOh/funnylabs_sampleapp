@@ -244,9 +244,9 @@ public class VitalLagacy {
     public float get_HR(double[] real_dft, int buff_size) {
         int max_index = 0;
         float max_val = 0;
-        float filter_interval = VIDEO_FRAME_RATE / (float)buff_size;
+        float filter_interval = 1 / (float)VIDEO_FRAME_RATE;
         for( int i =0 ; i < real_dft.length ; i++){
-            if( i * filter_interval < 0.83 )
+            if( i * filter_interval < 0.75 )
                 continue;
             else if( i * filter_interval > 2.5){
                 break;

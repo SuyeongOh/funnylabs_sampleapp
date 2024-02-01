@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.util.Log;
 import android.util.Size;
 import android.view.LayoutInflater;
@@ -88,7 +89,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
     public Bitmap mOriginalBitmap;
 
     private int sNthFrame = 0;
-    private int mRotation = 0;
+    private int mOrientation = 0;
     private final Rect FaceBox = new Rect();
 
     private boolean isFixFaceBox = false;
@@ -149,7 +150,6 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
         autoFitSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(@NonNull SurfaceHolder holder) {
-                Size screenSize = CameraUtils.getDisplaySmartSize(autoFitSurfaceView.getDisplay()).getSize();
                 Size previewSize = CameraUtils.getPreviewOutputSize(
                         autoFitSurfaceView.getDisplay()
                         , characteristics
@@ -157,11 +157,11 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                 Config.IMAGE_READER_WIDTH = previewSize.getWidth();
                 Config.IMAGE_READER_HEIGHT = previewSize.getHeight();
                 autoFitSurfaceView.setAspectRatio(
-                        screenSize.getWidth(),
-                        screenSize.getHeight()
+                        previewSize.getWidth(),
+                        previewSize.getHeight()
                 );
+
                 Log.d("Jupiter", String.format("Width : %d, Height : %d", previewSize.getWidth(), previewSize.getHeight()));
-//                autoFitSurfaceView.getHolder().setFixedSize(previewSize.getWidth(), previewSize.getHeight());
                 mTrackingOverlayView.setFullsize(autoFitSurfaceView.getWidth(), autoFitSurfaceView.getHeight());
                 view.post(() -> initCamera());
             }
@@ -187,7 +187,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
     }
     private void initCamera() {
         openCamera(cameraManager, cameraId, cameraHandler);
-        imageReader = ImageReader.newInstance(autoFitSurfaceView.getWidth(), autoFitSurfaceView.getHeight(), Config.PIXEL_FORMAT, Config.IMAGE_BUFFER_SIZE);
+        imageReader = ImageReader.newInstance(Config.IMAGE_READER_WIDTH, Config.IMAGE_READER_HEIGHT, Config.PIXEL_FORMAT, Config.IMAGE_BUFFER_SIZE);
         createCaptureSession(Camera, Arrays.asList(autoFitSurfaceView.getHolder().getSurface(), imageReader.getSurface()), cameraHandler);
     }
 
@@ -198,9 +198,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
             for(String cameraId : cameraManager.getCameraIdList()){
                 characteristics = cameraManager.getCameraCharacteristics(cameraId);
                 StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-                int rotation = getActivity().getWindowManager().getDefaultDisplay().getRotation();
-                mRotation = (sensorOrientation + rotation + 360) % 360;
+                mOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
 
                 if(map != null){
                     int lens = characteristics.get(CameraCharacteristics.LENS_FACING);
@@ -275,7 +273,9 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                                 return;
                             }
                             inputImage.getPlanes();
+
                             Bitmap tempImage = ImageUtils.convertYUV420ToARGB8888(inputImage);
+
                             if(sNthFrame == 0 && !calibrationTimerStart){
                                 startCalibrationTimer();
                                 calibrationTimerStart = true;
@@ -298,6 +298,11 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                                         bitmapImage, 0, 0, bitmapImage.getWidth(), bitmapImage.getHeight(), rotateMatrix, false);
                                 bitmapImage = Bitmap.createBitmap(
                                         bitmapImage, 0, 0, bitmapImage.getWidth(), bitmapImage.getHeight(), flipMatrix, false);
+                            } else{
+                                Matrix rotateMatrix = new Matrix();
+                                rotateMatrix.postRotate(-90);
+                                bitmapImage = Bitmap.createBitmap(
+                                        bitmapImage, 0, 0, bitmapImage.getWidth(), bitmapImage.getHeight(), rotateMatrix, false);
                             }
 
                             if(isFixFaceBox){
@@ -346,21 +351,39 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
         try {
             if (faceDetectorResults.get(0).detections().size() >= 1) {
                 RectF box = faceDetectorResults.get(0).detections().get(0).boundingBox();
-                List<NormalizedKeypoint> facePoints = faceDetectorResults.get(0).detections().get(0).keypoints().get();
+                FaceDetectorResult result = resultBundle.getResults().get(0);
 
-                if(mTrackingOverlayView.isOutBoundary(box)){
+
+                int displayedImageWidth = resultBundle.inputImageWidth;
+                int displayedImageHeight = resultBundle.inputImageHeight;
+
+                RectF faceBox = new RectF();
+                float displayRoiWidth = autoFitSurfaceView.getWidth() * resultBundle.inputImageHeight / (float)autoFitSurfaceView.getHeight();
+                float invisibleWidth = (resultBundle.inputImageWidth - displayRoiWidth) / 2;
+                faceBox.left = ((autoFitSurfaceView.getWidth()/displayRoiWidth) * (box.left - invisibleWidth));
+                faceBox.right =  ((autoFitSurfaceView.getWidth()/displayRoiWidth) * (box.right - invisibleWidth));
+
+                faceBox.top = box.top * autoFitSurfaceView.getHeight()/(float)resultBundle.inputImageHeight;
+                faceBox.bottom = box.bottom * autoFitSurfaceView.getHeight()/(float)resultBundle.inputImageHeight;
+
+                Log.d("Jupiter", String.format("variable : %f X %f\nDisplay size : %d X %d" +
+                                "\nBox : (%f, %f, %f, %f)"
+                        , displayRoiWidth, invisibleWidth, autoFitSurfaceView.getWidth(), autoFitSurfaceView.getHeight()
+                        , faceBox.left, faceBox.top, faceBox.right, faceBox.bottom));
+
+                if(mTrackingOverlayView.isOutBoundary(faceBox)){
                     if(!isStopPredict) {
                         stopPrediction(Config.TYPE_OF_OUT);
                     }
                     readyForNextImage();
                     return;
-                } else if(mTrackingOverlayView.isBigSize(box)){
+                } else if(mTrackingOverlayView.isBigSize(faceBox)){
                     if(!isStopPredict) {
                         stopPrediction(Config.TYPE_OF_BIG);
                     }
                     readyForNextImage();
                     return;
-                } else if (mTrackingOverlayView.isSmallSize(box)) {
+                } else if (mTrackingOverlayView.isSmallSize(faceBox)) {
                     if(!isStopPredict) {
                         stopPrediction(Config.TYPE_OF_SMALL);
                     }
@@ -374,10 +397,10 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                     box.round(FaceBox);
                     isFixFaceBox = true;
                     if (mTrackingOverlayView != null) {
-                        FaceDetectorResult result = resultBundle.getResults().get(0);
-                        mTrackingOverlayView.setResults(result,
-                                resultBundle.inputImageWidth,
-                                resultBundle.inputImageHeight);
+                        Log.d("Jupiter", String.format("input image size : %d X %d", displayedImageWidth, displayedImageHeight));
+                        mTrackingOverlayView.setResults(
+                                result, faceBox
+                        );
                         mTrackingOverlayView.invalidate();
                     }
                 }

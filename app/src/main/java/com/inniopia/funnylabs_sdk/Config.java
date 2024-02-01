@@ -26,7 +26,7 @@ public class Config {
 
     public static double USER_BMI = 0f;
 
-    public static final double MIN_FREQUENCY = 0.83f;
+    public static final double MIN_FREQUENCY = 0.75f;
     public static final double MAX_FREQUENCY = 2.5f;
 
     public static int IMAGE_READER_WIDTH;
