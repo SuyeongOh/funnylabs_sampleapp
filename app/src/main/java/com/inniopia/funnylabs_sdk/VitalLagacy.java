@@ -244,11 +244,11 @@ public class VitalLagacy {
     public float get_HR(double[] real_dft, int buff_size) {
         int max_index = 0;
         float max_val = 0;
-        float filter_interval = 1 / (float)VIDEO_FRAME_RATE;
+        float frequency_interval = VIDEO_FRAME_RATE / (float)BUFFER_SIZE;
         for( int i =0 ; i < real_dft.length ; i++){
-            if( i * filter_interval < 0.75 )
+            if( i * frequency_interval < 0.75 )
                 continue;
-            else if( i * filter_interval > 2.5){
+            else if( i * frequency_interval > 2.5){
                 break;
             }
             else{
@@ -258,16 +258,16 @@ public class VitalLagacy {
                 }
             }
         }
-        return max_index * filter_interval * 60;
+        return max_index * frequency_interval * 60;
     }
     public float get_RR(double[] real_dft, int buff_size) {
         int max_index = 0;
         float max_val = 0;
-        float filter_interval = 10 / (float)buff_size;
+        float frequency_interval = 10 / (float)buff_size;
         for( int i =0 ; i < real_dft.length ; i++){
-            if( i * filter_interval < 0.18 )
+            if( i * frequency_interval < 0.18 )
                 continue;
-            else if( i * filter_interval > 0.5){
+            else if( i * frequency_interval > 0.5){
                 break;
             }
             else{
@@ -277,7 +277,7 @@ public class VitalLagacy {
                 }
             }
         }
-        return max_index * filter_interval * 48;
+        return max_index * frequency_interval * 48;
     }
 
     public float LF_HF_ratio(double[] real_dft,int buff_size){
