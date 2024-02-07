@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.hardware.camera2.CameraAccessException;
@@ -18,11 +19,11 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
 import android.util.Log;
 import android.util.Size;
 import android.view.LayoutInflater;
@@ -37,7 +38,6 @@ import android.widget.TextView;
 
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
 import com.google.mediapipe.framework.image.MPImage;
-import com.google.mediapipe.tasks.components.containers.NormalizedKeypoint;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
 import com.inniopia.funnylabs_sdk.ui.AutoFitSurfaceView;
 import com.inniopia.funnylabs_sdk.ui.CommonPopupView;
@@ -105,6 +105,11 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
 
         mFrontCameraExecutor = Executors.newSingleThreadExecutor();
 
+        //밝기 100%로 올리기
+        WindowManager.LayoutParams layoutParams = getActivity().getWindow().getAttributes();
+        layoutParams.screenBrightness = 1.0f;
+        getActivity().getWindow().setAttributes(layoutParams);
+
         faceDetector = new EnhanceFaceDetector(requireContext(), this);
         faceDetector.setupFaceDetector();
     }
@@ -150,19 +155,38 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
         autoFitSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(@NonNull SurfaceHolder holder) {
-                Size previewSize = CameraUtils.getPreviewOutputSize(
-                        autoFitSurfaceView.getDisplay()
-                        , characteristics
-                        , SurfaceHolder.class);
-                Config.IMAGE_READER_WIDTH = previewSize.getWidth();
-                Config.IMAGE_READER_HEIGHT = previewSize.getHeight();
-                autoFitSurfaceView.setAspectRatio(
-                        previewSize.getWidth(),
-                        previewSize.getHeight()
-                );
+                openCamera(cameraManager, cameraId, cameraHandler);
+                Size[] sizeArray = (characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(Config.PIXEL_FORMAT));
+                Size imageReaderSize = null;
+                for(int i = sizeArray.length - 1; i > 0; i--){
 
-                Log.d("Jupiter", String.format("Width : %d, Height : %d", previewSize.getWidth(), previewSize.getHeight()));
-                mTrackingOverlayView.setFullsize(autoFitSurfaceView.getWidth(), autoFitSurfaceView.getHeight());
+                    if(CameraUtils.isHdRatio(sizeArray[i]) && (sizeArray[i].getWidth() >= 640)){
+                        imageReaderSize = sizeArray[i];
+                        break;
+                    }
+                }
+                if(imageReaderSize == null){
+                    imageReaderSize = new Size(autoFitSurfaceView.getWidth(), autoFitSurfaceView.getHeight());
+                }
+                imageReader = ImageReader.newInstance(imageReaderSize.getWidth(), imageReaderSize.getHeight(), Config.PIXEL_FORMAT, Config.IMAGE_BUFFER_SIZE);
+
+
+
+                Point displaySize = new Point();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    getActivity().getDisplay().getRealSize(displaySize);
+                }
+
+                //세로 방향 인지 판단
+                int rotation = getActivity().getWindowManager().getDefaultDisplay().getRotation();
+                if(rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270){ // landscape
+                    displaySize.y = displaySize.x * imageReaderSize.getWidth() / imageReaderSize.getHeight();
+                    autoFitSurfaceView.setAspectRatio(displaySize.y, displaySize.x);
+                } else{ // portrait 16:9 >> 9:16 전환
+                    displaySize.y = displaySize.x * imageReaderSize.getWidth() / imageReaderSize.getHeight();
+                    autoFitSurfaceView.setAspectRatio(displaySize.x, displaySize.y);
+                }
+
                 view.post(() -> initCamera());
             }
 
@@ -186,8 +210,6 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
         imageReaderHandler = new Handler(imageReaderThread.getLooper());
     }
     private void initCamera() {
-        openCamera(cameraManager, cameraId, cameraHandler);
-        imageReader = ImageReader.newInstance(Config.IMAGE_READER_WIDTH, Config.IMAGE_READER_HEIGHT, Config.PIXEL_FORMAT, Config.IMAGE_BUFFER_SIZE);
         createCaptureSession(Camera, Arrays.asList(autoFitSurfaceView.getHolder().getSurface(), imageReader.getSurface()), cameraHandler);
     }
 
@@ -309,8 +331,8 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                                 Bitmap faceImage = Bitmap.createBitmap(bitmapImage, FaceBox.left, FaceBox.top, FaceBox.width(), FaceBox.height());
                                 isFinishAnalysis = mBpmAnalysisViewModel.addFaceImageModel(new FaceImageModel(faceImage, System.currentTimeMillis()));
                                 Log.d("Result", "Nth Frame : " + sNthFrame);
-                                if(mProgressBar.getProgress() != (sNthFrame/(Vital.BATCH_SIZE * Vital.FRAME_WINDOW_SIZE / 100))){
-                                    updateProgressBar(sNthFrame/(Vital.BATCH_SIZE * Vital.FRAME_WINDOW_SIZE / 100));
+                                if(mProgressBar.getProgress() != (sNthFrame/(VitalLagacy.BUFFER_SIZE / 100))){
+                                    updateProgressBar(sNthFrame/(VitalLagacy.BUFFER_SIZE / 100));
                                 }
                                 sNthFrame ++;
                                 if(isFinishAnalysis){
@@ -341,49 +363,18 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
 
     public void processImage(MPImage image, EnhanceFaceDetector.ResultBundle resultBundle){
         postInferenceCallback = image::close;
-        if(sNthFrame > Vital.BATCH_SIZE * Vital.FRAME_WINDOW_SIZE){
-            return;
-        }
         List<FaceDetectorResult> faceDetectorResults = resultBundle.getResults();
-
-        FaceImageModel faceImageModel = null;
-
+        RectF transBox = new RectF();
         try {
             if (faceDetectorResults.get(0).detections().size() >= 1) {
                 RectF box = faceDetectorResults.get(0).detections().get(0).boundingBox();
-                FaceDetectorResult result = resultBundle.getResults().get(0);
-
-
-                int displayedImageWidth = resultBundle.inputImageWidth;
-                int displayedImageHeight = resultBundle.inputImageHeight;
-
-                RectF faceBox = new RectF();
-                float displayRoiWidth = autoFitSurfaceView.getWidth() * resultBundle.inputImageHeight / (float)autoFitSurfaceView.getHeight();
-                float invisibleWidth = (resultBundle.inputImageWidth - displayRoiWidth) / 2;
-                faceBox.left = ((autoFitSurfaceView.getWidth()/displayRoiWidth) * (box.left - invisibleWidth));
-                faceBox.right =  ((autoFitSurfaceView.getWidth()/displayRoiWidth) * (box.right - invisibleWidth));
-
-                faceBox.top = box.top * autoFitSurfaceView.getHeight()/(float)resultBundle.inputImageHeight;
-                faceBox.bottom = box.bottom * autoFitSurfaceView.getHeight()/(float)resultBundle.inputImageHeight;
-
-                Log.d("Jupiter", String.format("variable : %f X %f\nDisplay size : %d X %d" +
-                                "\nBox : (%f, %f, %f, %f)"
-                        , displayRoiWidth, invisibleWidth, autoFitSurfaceView.getWidth(), autoFitSurfaceView.getHeight()
-                        , faceBox.left, faceBox.top, faceBox.right, faceBox.bottom));
-
-                if(mTrackingOverlayView.isOutBoundary(faceBox)){
+                if(mTrackingOverlayView.isOutBoundary(box)){
                     if(!isStopPredict) {
                         stopPrediction(Config.TYPE_OF_OUT);
                     }
                     readyForNextImage();
                     return;
-                } else if(mTrackingOverlayView.isBigSize(faceBox)){
-                    if(!isStopPredict) {
-                        stopPrediction(Config.TYPE_OF_BIG);
-                    }
-                    readyForNextImage();
-                    return;
-                } else if (mTrackingOverlayView.isSmallSize(faceBox)) {
+                } else if (mTrackingOverlayView.isSmallSize(box)) {
                     if(!isStopPredict) {
                         stopPrediction(Config.TYPE_OF_SMALL);
                     }
@@ -393,17 +384,25 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
                 isStopPredict = false;
                 mGuidePopupView.dismiss();
 
-                if(!isFixFaceBox) {
+                isFixFaceBox = true;
+                if(Config.LARGE_FACE_MODE){
+//                    float width = box.width();
+//                    float height = box.height();
+//                    box.left -= width/4;
+//                    box.right += width/4;
+//                    box.top -= height/4;
+//                    box.bottom += height/4;
+//                    box.round(FaceBox);
+                } else{
                     box.round(FaceBox);
-                    isFixFaceBox = true;
-                    if (mTrackingOverlayView != null) {
-                        Log.d("Jupiter", String.format("input image size : %d X %d", displayedImageWidth, displayedImageHeight));
-                        mTrackingOverlayView.setResults(
-                                result, faceBox
-                        );
-                        mTrackingOverlayView.invalidate();
-                    }
                 }
+
+            }
+            if (mTrackingOverlayView != null) {
+                FaceDetectorResult result = resultBundle.getResults().get(0);
+                mTrackingOverlayView.setResults(result,
+                        resultBundle.inputImageWidth,
+                        resultBundle.inputImageHeight);
             }
         } catch (Exception e){
             e.printStackTrace();
@@ -468,9 +467,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
     @Override
     public void onResults(MPImage input, Bitmap original, EnhanceFaceDetector.ResultBundle resultBundle) {
         mOriginalBitmap = original;
-        if(sNthFrame <= 600){
-            processImage(input, resultBundle);
-        }
+        processImage(input, resultBundle);
     }
 
     private void stopPrediction(String type){

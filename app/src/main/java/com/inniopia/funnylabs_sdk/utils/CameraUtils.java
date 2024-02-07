@@ -70,4 +70,8 @@ public class CameraUtils {
                 .orElse(null)
                 .getSize();
     }
+
+    public static boolean isHdRatio(Size size){
+        return size.getWidth() == (((size.getWidth() + size.getHeight()) / 25) * 16);
+    }
 }

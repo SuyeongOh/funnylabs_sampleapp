@@ -27,12 +27,12 @@
 
         <com.inniopia.funnylabs_sdk.OverlayView
             android:id="@+id/tracking_overlay"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintStart_toStartOf="@+id/container_surface"
+            app:layout_constraintEnd_toEndOf="@+id/container_surface"
+            app:layout_constraintTop_toTopOf="@+id/container_surface"
+            app:layout_constraintBottom_toBottomOf="@+id/container_surface" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

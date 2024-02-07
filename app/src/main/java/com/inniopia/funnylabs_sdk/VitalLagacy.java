@@ -12,9 +12,11 @@ import com.github.psambit9791.jdsp.transform.Hilbert;
 import com.inniopia.funnylabs_sdk.bvp.BandPassFilter;
 import com.inniopia.funnylabs_sdk.data.ResultVitalSign;
 import com.inniopia.funnylabs_sdk.utils.FloatUtils;
+import com.inniopia.funnylabs_sdk.utils.RppgUtils;
 import com.paramsen.noise.Noise;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import jsat.linear.DenseMatrix;
@@ -26,10 +28,10 @@ import uk.me.berndporr.iirj.Butterworth;
 import static java.lang.Math.abs;
 
 public class VitalLagacy {
-    private static final int BUFFER_SIZE = 512;
+    public static final int BUFFER_SIZE = 600;
     private static final int BPM_BUFFER_SIZE = 1;
-    private static final int BPM_CALCULATION_FREQUENCY = 512;
-    private static final int BP_CALCULATION_FREQUENCY = 512;
+    private static final int BPM_CALCULATION_FREQUENCY = BUFFER_SIZE;
+    private static final int BP_CALCULATION_FREQUENCY = BUFFER_SIZE;
     public static int VIDEO_FRAME_RATE = 30;
 
     private static final int GAUSSIAN_W = 72;
@@ -69,6 +71,8 @@ public class VitalLagacy {
     final float[] bpm = {0.0f};
     final float[] rr = {0.0f};
 
+    private double[] bvpSignal;
+
     public Result calculateVital(FaceImageModel model) {
         //rescale: resizez + gaussian
         if(pixelIndex == 0) firstFrameTime = model.frameUtcTimeMs;
@@ -104,23 +108,12 @@ public class VitalLagacy {
             lastFrameTime = model.frameUtcTimeMs;
             //VIDEO_FRAME_RATE = 1000 / (int)((lastFrameTime - firstFrameTime) / pixelIndex);
             double[] pre_processed = preprocessing(f_pixel_buff);
-            bpm_Buffer[bpm_buffer_index] = (get_HR(pre_processed,BUFFER_SIZE));
-            rr_Buffer[bpm_buffer_index] = (get_RR(pre_processed,BUFFER_SIZE));
+            lastResult.HR_result = get_HR(pre_processed,BUFFER_SIZE);
+            lastResult.RR_result = get_RR(pre_processed,BUFFER_SIZE);
             bpm_buffer_index = (bpm_buffer_index + 1) % BPM_BUFFER_SIZE;
-            int i;
-            for (i = 0, bpm[0] = 0, rr[0] = 0; i < BPM_BUFFER_SIZE; i++) {
-                bpm[0] += bpm_Buffer[i];
-                rr[0] += rr_Buffer[i];
-                if (bpm_Buffer[i] == 0.0f && rr_Buffer[i] == 0.0f) {
-                    break;
-                }
-            }
-            lastResult.HR_result = Math.round(bpm[0] /(i));
-            lastResult.RR_result = Math.round(rr[0] /(i));
+
             //--------SDNN --------------------//
-//            lastResult.sdnn_result = SDNN(bpm_Buffer, bpm_buffer_index);
-//            lastResult.sdnn_result = Math.round(lastResult.sdnn_result * 100) / 100.0;
-//            lastResult.sdnn_result = lastResult.sdnn_result * 100;
+            lastResult.sdnn_result = HRV_IBI(bvpSignal,frameTimeArray, lastResult.HR_result);
             //--------SDNN --------------------//
             lastResult.LF_HF_ratio = LF_HF_ratio(pre_processed,BUFFER_SIZE);
 
@@ -130,8 +123,7 @@ public class VitalLagacy {
                 lastResult.spo2_result = 0;
             }
             lastResult.spo2_result = Math.round(lastResult.spo2_result);
-        }
-        if ((pixelIndex % BP_CALCULATION_FREQUENCY) == (BP_CALCULATION_FREQUENCY - 1)) {
+
             double[] preprocessed_g = get_normG(f_pixel_buff[1]);
             double peak_avg = get_peak_avg(preprocessed_g,true);
             double valley_avg = get_peak_avg(preprocessed_g,false);
@@ -143,9 +135,6 @@ public class VitalLagacy {
             lastResult.DBP = -17.3772 - (115.1747 * valley_avg) + (4.0251 * bmi) + (5.2825 * valley_avg * bmi);
 
             lastResult.BP = lastResult.SBP * 0.33 + lastResult.DBP * 0.66;
-
-            lastResult.HR_result = FloatUtils.mean(bpm_Buffer);
-            lastResult.RR_result = FloatUtils.mean(rr_Buffer);
         }
         bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
         pixelIndex++;
@@ -199,6 +188,8 @@ public class VitalLagacy {
         for(int i = 1; i < d_g.length; i++){
             bpf_signal[i] = bpf.filter(d_g[i], timeSmoothing[i] - timeSmoothing[i - 1]);
         }
+
+        bvpSignal = bpf_signal;
 
         DiscreteFourier fft_r = new DiscreteFourier(bpf_signal);
         fft_r.dft();
@@ -294,54 +285,47 @@ public class VitalLagacy {
         return LF/HF;
     }
 
-    public double SDNN(float[] bpm_Buffer, int bpm_buffer_index){
-
-        float sum = 0.0f;
-        float avg;
-        float dev = 0;
-        double devSqvSum = 0;
-        double var;
-
-
-        if (bpm_Buffer[1] != 0) {
-            if (bpm_buffer_index == 0) {
-
-                RR1 = bpm_Buffer[BPM_BUFFER_SIZE - 1] / 60;
-                RR2 = bpm_Buffer[0] / 60;
-
-            } else {
-                RR1 = bpm_Buffer[bpm_buffer_index - 1] / 60;
-                RR2 = bpm_Buffer[bpm_buffer_index] / 60;
+    public double HRV_IBI(double[] signalG, long[] frameTimeArray, double hr){
+        //peak detect
+        ArrayList<Long> peakTimes = new ArrayList<>();
+        int[] peakArray = RppgUtils.PeakDetect(signalG, frameTimeArray, hr);
+        for(int i = 0; i < peakArray.length; i++){
+            if(peakArray[i] == 1){
+                peakTimes.add(frameTimeArray[i]);
             }
-
-            Log.d("R1R2", "RR1 : " + RR1 + " " + "RR2 : " + RR2);
-            NN.add(abs(RR2 - RR1));
-
-            if (NN.size() >= 2) {
-                result.add(abs((NN.get(NN.size() - 2)) - (NN.get(NN.size() - 1))));
-                Log.d("NN_result", "size : " + NN.size() + " " + "NN1 : " + NN.get(NN.size() - 2) + " " + "NN2 : " + NN.get(NN.size() - 1) + " " + "result : " + result);
-
-                for (int i = 0; i < result.size(); i++) {
-                    sum = sum + result.get(i);
-                }
-
-                avg = sum / result.size();
-
-                for (int i = 0; i < result.size(); i++) {
-                    dev = (abs(result.get(i) - avg));
-                    devSqvSum = (devSqvSum + Math.pow(dev, 2));
-                }
-
-                var = devSqvSum / (result.size() - 1);
-                SDNN_result = Math.sqrt(var);
-
-                Log.d("NN_result", "SDNN : " + SDNN_result + " " + "size" + " " + result.size());
-                Log.d("NN_result", "dev : " + dev + " " + "devSqvSum" + " " + devSqvSum + " " + "var  : " + var);
-                Log.d("NN_result", "sum : " + sum + " " + "avg : " + avg);
-            }
-
         }
-        return SDNN_result;
+
+        ArrayList<Long> rrIntervals = new ArrayList<>();
+        if(peakTimes.size() > 6){
+            for(int i = 0; i < peakTimes.size() - 2; i++){
+                rrIntervals.add(peakTimes.get(i + 1) - peakTimes.get(i));
+            }
+        }
+
+        if(rrIntervals.size() == 0) return 0;
+
+        Collections.sort(rrIntervals);
+        double median;
+        int middle = rrIntervals.size() / 2;
+        if (rrIntervals.size() % 2 == 0) {
+            median = ((double)rrIntervals.get(middle - 1) + (double)rrIntervals.get(middle)) / 2.0;
+        } else {
+            median = (double)rrIntervals.get(middle);
+        }
+
+        double lowerBound = median - 0.1 * median;
+        double upperBound = median + 0.1 * median;
+        ArrayList<Double> filteredValues = new ArrayList<>();
+        for (Long rrInterval : rrIntervals) {
+            if (lowerBound <= rrInterval && rrInterval <= upperBound) {
+                filteredValues.add((double)rrInterval);
+            }
+        }
+
+        if (filteredValues.isEmpty()) return 0.0;
+        double mean = filteredValues.stream().mapToDouble(a -> a).average().orElse(0.0);
+        double sumOfSquaredDifferences = filteredValues.stream().mapToDouble(a -> a - mean).map(a -> a * a).sum();
+        return Math.sqrt(sumOfSquaredDifferences / filteredValues.size());
     }
 
     public double spo2(double[] spo2_pixel_buff_R, double[] spo2_pixel_buff_B, int VIDEO_FRAME_RATE) {

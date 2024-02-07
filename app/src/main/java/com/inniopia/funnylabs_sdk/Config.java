@@ -31,4 +31,6 @@ public class Config {
 
     public static int IMAGE_READER_WIDTH;
     public static int IMAGE_READER_HEIGHT;
+
+    public static boolean LARGE_FACE_MODE = false;
 }
