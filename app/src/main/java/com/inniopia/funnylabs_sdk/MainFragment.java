@@ -128,7 +128,7 @@ public class MainFragment extends Fragment implements EnhanceFaceDetector.Detect
         initThread();
 
         //Camera2
-        autoFitSurfaceView = view.findViewById(R.id.view_finder_camera2);
+        autoFitSurfaceView = surfaceView.findViewById(R.id.view_finder_camera2);
 
         //Face Detection
         mTrackingOverlayView = view.findViewById(R.id.tracking_overlay);

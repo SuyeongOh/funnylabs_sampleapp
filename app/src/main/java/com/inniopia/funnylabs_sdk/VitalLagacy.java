@@ -296,7 +296,7 @@ public class VitalLagacy {
         }
 
         ArrayList<Long> rrIntervals = new ArrayList<>();
-        if(peakTimes.size() > 6){
+        if(peakTimes.size() > 3){
             for(int i = 0; i < peakTimes.size() - 2; i++){
                 rrIntervals.add(peakTimes.get(i + 1) - peakTimes.get(i));
             }

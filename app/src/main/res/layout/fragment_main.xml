@@ -2,7 +2,6 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    xmlns:mstb="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:animateLayoutChanges="true"
@@ -18,10 +17,8 @@
 
         <FrameLayout
             android:id="@+id/container_surface"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"/>
 
@@ -66,61 +63,5 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/top_layout"
         tools:progress="50" />
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        app:layout_constraintHeight_percent="0.3"
-        app:layout_constraintBottom_toBottomOf="parent">
-
-        <com.robinhood.ticker.TickerView
-            android:id="@+id/total_ews"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_marginBottom="5dp"
-            android:textAppearance="@style/TickerTextAppearance_main"
-            android:background="@drawable/bg_white_border_light_blue_grey_r4"
-            android:textColor="@color/greyish_brown"
-            android:gravity="center_vertical"
-            android:padding="5dp"
-            android:visibility="gone"
-            app:layout_constraintWidth_percent="0.2655"
-            app:layout_constraintLeft_toLeftOf="@id/old_vital_info_layout"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/old_vital_info_layout"
-            tools:text="Total EWS : 10"/>
-
-        <com.robinhood.ticker.TickerView
-            android:id="@+id/total_diagnosis"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:textAppearance="@style/TickerTextAppearance_main"
-            android:background="@drawable/bg_white_border_light_blue_grey_r4"
-            android:textColor="@color/greyish_brown"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="5dp"
-            android:padding="5dp"
-            android:visibility="gone"
-            app:layout_constraintRight_toRightOf="@id/old_vital_info_layout"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/old_vital_info_layout"
-            app:layout_constraintWidth_percent="0.59"
-            tools:text="Comment : 건강이 위험합니다."/>
-
-        <include
-            android:id="@+id/old_vital_info_layout"
-            layout="@layout/layout_info_container"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/info_container_h"
-            android:layout_marginStart="@dimen/vital_analysis_start_margin"
-            android:layout_marginEnd="@dimen/vital_analysis_end_margin"
-            android:layout_marginTop="@dimen/vital_origin_info_margin_top"
-            android:layout_marginBottom="@dimen/vital_origin_info_margin_bottom"
-            android:visibility="gone"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
